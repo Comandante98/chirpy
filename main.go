@@ -12,6 +12,12 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	})
+	type apiConfig struct {
+		fileserverHits atomic.Int32
+	}
+	func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
+		cfg.fileserverHits.add()
+	}
 	server := &http.Server{
     Addr:    ":8080",
     Handler: mux,

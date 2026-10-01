@@ -3,8 +3,8 @@ package main
 import (
 	"log"
 	"net/http"
-	"strconv"
 	"sync/atomic"
+	"fmt"
 )
 
 type apiConfig struct {
@@ -19,8 +19,15 @@ func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 }
 
 func (cfg *apiConfig) handlerCounter(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
     w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Hits: " + strconv.Itoa(int((cfg.fileserverHits.Load())))))
+	w.Write([]byte(fmt.Sprintf(
+	`<html>
+  		<body>
+    		<h1>Welcome, Chirpy Admin</h1>
+    		<p>Chirpy has been visited %d times!</p>
+  		</body>
+	</html>`, cfg.fileserverHits.Load())))
 }
 
 func (cfg *apiConfig) handlerReset(w http.ResponseWriter, req *http.Request) {
@@ -31,7 +38,7 @@ func (cfg *apiConfig) handlerReset(w http.ResponseWriter, req *http.Request) {
 func main() {
 	cfg := apiConfig{}
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, req *http.Request){
+	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, req *http.Request){
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
@@ -39,8 +46,8 @@ func main() {
 	
 	
 	mux.Handle("/app/", cfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(".")))))
-	mux.HandleFunc("GET /metrics", cfg.handlerCounter)
-	mux.HandleFunc("POST /reset", cfg.handlerReset)
+	mux.HandleFunc("GET /admin/metrics", cfg.handlerCounter)
+	mux.HandleFunc("POST /admin/reset", cfg.handlerReset)
 	
 	server := &http.Server{
     Addr:    ":8080",

@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"fmt"
 	"encoding/json"
+	"strings"
 )
 
 type apiConfig struct {
@@ -42,7 +43,7 @@ func (cfg *apiConfig) handlerValidate(w http.ResponseWriter, req *http.Request) 
 	}
 
 	type returnVals struct{
-		Valid bool `json:"valid"`
+		CleanedBody string `json:"cleaned_body"`
 	}
 
 	decoder := json.NewDecoder(req.Body)
@@ -59,8 +60,16 @@ func (cfg *apiConfig) handlerValidate(w http.ResponseWriter, req *http.Request) 
 		return
 	}
 
+	splitted := strings.Split(params.Body, " ")
+	for i, v := range splitted{
+		if strings.ToLower(v) == "kerfuffle" || strings.ToLower(v) == "sharbert" || strings.ToLower(v) == "fornax"{
+			splitted[i] = "****"
+		}
+	}
+	joined := strings.Join(splitted, " ")
+
 	respondWithJSON(w, http.StatusOK, returnVals{
-		Valid: true,
+		CleanedBody: joined,
 	})
 }
 

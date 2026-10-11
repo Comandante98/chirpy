@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sync/atomic"
 	"fmt"
+	"encoding/json"
 )
 
 type apiConfig struct {
@@ -35,6 +36,34 @@ func (cfg *apiConfig) handlerReset(w http.ResponseWriter, req *http.Request) {
     w.WriteHeader(http.StatusOK)
 }
 
+func (cfg *apiConfig) handlerValidate(w http.ResponseWriter, req *http.Request) {
+	type parameters struct{
+		Body string `json:"body"`
+	}
+
+	type returnVals struct{
+		Valid bool `json:"valid"`
+	}
+
+	decoder := json.NewDecoder(req.Body)
+    params := parameters{}
+    err := decoder.Decode(&params)
+    if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters", err)
+		return
+	}
+
+	const maxChirpLength = 140
+	if len(params.Body) > maxChirpLength {
+		respondWithError(w, http.StatusBadRequest, "Chirp is too long", nil)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, returnVals{
+		Valid: true,
+	})
+}
+
 func main() {
 	cfg := apiConfig{}
 	mux := http.NewServeMux()
@@ -48,6 +77,7 @@ func main() {
 	mux.Handle("/app/", cfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(".")))))
 	mux.HandleFunc("GET /admin/metrics", cfg.handlerCounter)
 	mux.HandleFunc("POST /admin/reset", cfg.handlerReset)
+	mux.HandleFunc("POST /api/validate_chirp", cfg.handlerValidate)
 	
 	server := &http.Server{
     Addr:    ":8080",

@@ -1,16 +1,22 @@
 package main
 
 import (
+	_ "github.com/lib/pq"
 	"log"
 	"net/http"
 	"sync/atomic"
 	"fmt"
 	"encoding/json"
 	"strings"
+	"os"
+	"github.com/joho/godotenv"
+	"chirpy/internal/database"
+	"database/sql"
 )
 
 type apiConfig struct {
 	fileserverHits atomic.Int32
+	db *database.Queries
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -74,7 +80,14 @@ func (cfg *apiConfig) handlerValidate(w http.ResponseWriter, req *http.Request) 
 }
 
 func main() {
-	cfg := apiConfig{}
+	godotenv.Load()
+	dbURL := os.Getenv("DB_URL")
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+    	log.Printf("Error conecting: %s", err)
+	}
+	dbQueries := database.New(db)
+	cfg := apiConfig{fileserverHits: atomic.Int32{}, db: dbQueries}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, req *http.Request){
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")

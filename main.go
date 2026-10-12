@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"sync/atomic"
 	"fmt"
-	"encoding/json"
-	"strings"
 	"os"
 	"github.com/joho/godotenv"
 	"chirpy/internal/database"
@@ -17,6 +15,7 @@ import (
 type apiConfig struct {
 	fileserverHits atomic.Int32
 	db *database.Queries
+	platform string
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -39,44 +38,21 @@ func (cfg *apiConfig) handlerCounter(w http.ResponseWriter, req *http.Request) {
 }
 
 func (cfg *apiConfig) handlerReset(w http.ResponseWriter, req *http.Request) {
+	if cfg.platform != "dev" {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte("Reset is only allowed in dev environment."))
+		return
+	}
+
 	cfg.fileserverHits.Store(0)
-    w.WriteHeader(http.StatusOK)
-}
-
-func (cfg *apiConfig) handlerValidate(w http.ResponseWriter, req *http.Request) {
-	type parameters struct{
-		Body string `json:"body"`
-	}
-
-	type returnVals struct{
-		CleanedBody string `json:"cleaned_body"`
-	}
-
-	decoder := json.NewDecoder(req.Body)
-    params := parameters{}
-    err := decoder.Decode(&params)
-    if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters", err)
+	err := cfg.db.Reset(req.Context())
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to reset the database: " + err.Error()))
 		return
 	}
-
-	const maxChirpLength = 140
-	if len(params.Body) > maxChirpLength {
-		respondWithError(w, http.StatusBadRequest, "Chirp is too long", nil)
-		return
-	}
-
-	splitted := strings.Split(params.Body, " ")
-	for i, v := range splitted{
-		if strings.ToLower(v) == "kerfuffle" || strings.ToLower(v) == "sharbert" || strings.ToLower(v) == "fornax"{
-			splitted[i] = "****"
-		}
-	}
-	joined := strings.Join(splitted, " ")
-
-	respondWithJSON(w, http.StatusOK, returnVals{
-		CleanedBody: joined,
-	})
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Hits reset to 0 and database reset to initial state."))
 }
 
 func main() {
@@ -86,8 +62,12 @@ func main() {
 	if err != nil {
     	log.Printf("Error conecting: %s", err)
 	}
+	platform := os.Getenv("PLATFORM")
+		if platform == "" {
+			log.Fatal("PLATFORM must be set")
+	}
 	dbQueries := database.New(db)
-	cfg := apiConfig{fileserverHits: atomic.Int32{}, db: dbQueries}
+	cfg := apiConfig{fileserverHits: atomic.Int32{}, db: dbQueries, platform: platform}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, req *http.Request){
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -99,7 +79,8 @@ func main() {
 	mux.Handle("/app/", cfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(".")))))
 	mux.HandleFunc("GET /admin/metrics", cfg.handlerCounter)
 	mux.HandleFunc("POST /admin/reset", cfg.handlerReset)
-	mux.HandleFunc("POST /api/validate_chirp", cfg.handlerValidate)
+	mux.HandleFunc("POST /api/chirps", cfg.handlerChirpsCreate)
+	mux.HandleFunc("POST /api/users", cfg.handlerUsersCreate)
 	
 	server := &http.Server{
     Addr:    ":8080",

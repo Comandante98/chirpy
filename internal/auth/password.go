@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"argon2id"
+	"github.com/alexedwards/argon2id"
 )
 
 func HashPassword(password string) (string, error) {

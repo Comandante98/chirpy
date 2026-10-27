@@ -5,17 +5,18 @@ import (
 	"encoding/json"
 	"chirpy/internal/auth"
 	"time"
+	"chirpy/internal/database"
 )
 
 func (cfg *apiConfig) handlerUsersLogin(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Email string `json:"email"`
 		Password string `json:"password"`
-		ExpiresInSeconds int `json:"expires_in_seconds"`
 	}
 	type response struct {
 		User
 		Token string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -42,21 +43,19 @@ func (cfg *apiConfig) handlerUsersLogin(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var expiresIn time.Duration
-	if params.ExpiresInSeconds == 0 {
-		expiresIn = time.Hour
-	} else {
-    	expiresIn = time.Duration(params.ExpiresInSeconds) * time.Second
-    	if expiresIn > time.Hour {
-        	expiresIn = time.Hour
-    	}
-	}
-
-	token, err := auth.MakeJWT(user.ID, cfg.secret, expiresIn)
+	token, err := auth.MakeJWT(user.ID, cfg.secret, time.Hour)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't make JWT", err)
 		return
 	}
+
+	rToken, err := cfg.db.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{Token: auth.MakeRefreshToken(), UserID: user.ID, ExpiresAt: time.Now().Add(time.Hour * 24 * 60)})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't create token", err)
+		return
+	}
+
+
 
 	respondWithJSON(w, http.StatusOK, response{
 		User: User{
@@ -66,5 +65,6 @@ func (cfg *apiConfig) handlerUsersLogin(w http.ResponseWriter, r *http.Request) 
 			Email:            user.Email,
 		},
 		Token: token,
+		RefreshToken: rToken.Token,
 	})
 }

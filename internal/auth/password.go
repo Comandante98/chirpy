@@ -68,6 +68,11 @@ func GetBearerToken(headers http.Header) (string, error) {
 	return token, nil
 }
 
+func getEvent(headers http.Header) (string) {
+	event := headers.Get("Event")
+	return event
+}
+
 func MakeRefreshToken() string {
 	key := make([]byte, 32)
 	rand.Read(key)

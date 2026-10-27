@@ -17,6 +17,7 @@ type apiConfig struct {
 	db *database.Queries
 	platform string
 	secret string
+	polkaKey string
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -60,6 +61,7 @@ func main() {
 	godotenv.Load()
 	dbURL := os.Getenv("DB_URL")
 	secret := os.Getenv("JWT_SECRET")
+	polkaKey := os.Getenv("POLKA_KEY")
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
     	log.Printf("Error conecting: %s", err)
@@ -69,7 +71,7 @@ func main() {
 			log.Fatal("PLATFORM must be set")
 	}
 	dbQueries := database.New(db)
-	cfg := apiConfig{fileserverHits: atomic.Int32{}, db: dbQueries, platform: platform, secret: secret}
+	cfg := apiConfig{fileserverHits: atomic.Int32{}, db: dbQueries, platform: platform, secret: secret, polkaKey: polkaKey}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, req *http.Request){
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")

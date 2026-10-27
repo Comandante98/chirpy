@@ -17,7 +17,7 @@ func (cfg *apiConfig) handlerChirpsCounter(w http.ResponseWriter, r *http.Reques
 			ID:        dbChirp.ID,
 			CreatedAt: dbChirp.CreatedAt,
 			UpdatedAt: dbChirp.UpdatedAt,
-			UserId:    dbChirp.UserID,
+			UserID:    dbChirp.UserID,
 			Body:      dbChirp.Body,
 		})
 	}

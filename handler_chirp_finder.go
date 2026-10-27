@@ -23,7 +23,7 @@ func (cfg *apiConfig) handlerChirpFinder(w http.ResponseWriter, r *http.Request)
 		ID:        dbChirp.ID,
 		CreatedAt: dbChirp.CreatedAt,
 		UpdatedAt: dbChirp.UpdatedAt,
-		UserId:    dbChirp.UserID,
+		UserID:    dbChirp.UserID,
 		Body:      dbChirp.Body,
 	})
 }

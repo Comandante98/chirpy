@@ -6,7 +6,7 @@ import (
 	"time"
 	"strings"
 	"chirpy/internal/database"
-
+	"chirpy/internal/auth"
 	"github.com/google/uuid"
 )
 
@@ -15,13 +15,12 @@ type Chirp struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Body      string    `json:"body"`
-	UserId    uuid.UUID `json:"user_id"`
+	UserID    uuid.UUID `json:"user_id"`
 }
 
 func (cfg *apiConfig) handlerChirpsCreate(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Body   string    `json:"body"`
-		UserId uuid.UUID `json:"user_id"`
 	}
 	type response struct {
 		Chirp
@@ -49,7 +48,19 @@ func (cfg *apiConfig) handlerChirpsCreate(w http.ResponseWriter, r *http.Request
 	}
 	joined := strings.Join(splitted, " ")
 
-	chirp, err := cfg.db.CreateChirp(r.Context(), database.CreateChirpParams{Body: joined, UserID: params.UserId})
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't find token", err)
+		return
+	}
+
+	userID, err := auth.ValidateJWT(token, cfg.secret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't validate JWT", err)
+		return
+	} 
+
+	chirp, err := cfg.db.CreateChirp(r.Context(), database.CreateChirpParams{Body: joined, UserID: userID})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create chirp", err)
 		return
@@ -61,7 +72,7 @@ func (cfg *apiConfig) handlerChirpsCreate(w http.ResponseWriter, r *http.Request
 			CreatedAt: chirp.CreatedAt,
 			UpdatedAt: chirp.UpdatedAt,
 			Body:      joined,
-			UserId:    chirp.UserID,
+			UserID:    chirp.UserID,
 		},
 	})
 }

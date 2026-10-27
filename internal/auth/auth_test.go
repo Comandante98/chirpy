@@ -44,3 +44,26 @@ func TestWrongSecret(t *testing.T) {
 		t.Errorf("expected error for wrong secret, got nil")
 	}
 }
+
+func TestBearerToken(t *testing.T) {
+	m := http.Header{
+		"Authorization": {"Bearer xd29cj3xkd3"},
+	}
+	newToken, err := GetBearerToken(m)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if newToken != "xd29cj3xkd3" {
+		t.Errorf("wrong token string")
+	}
+}
+
+func TestMissingAuthorization(t *testing.T) {
+	m := http.Header{
+		"Bearer": {"Bearer xd29cj3xkd3"},
+	}
+	_, err := GetBearerToken(m)
+	if err == nil {
+		t.Errorf("expected missing authorization error, got nil")
+	}
+}

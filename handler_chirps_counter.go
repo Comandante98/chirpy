@@ -2,12 +2,39 @@ package main
 
 import (
 	"net/http"
+	"github.com/google/uuid"
+	"chirpy/internal/database"
 )
 
-func (cfg *apiConfig) handlerChirpsCounter(w http.ResponseWriter, r *http.Request) {
-	dbChirps, err := cfg.db.GetChirps(r.Context())
+func authorIDFromRequest(r *http.Request) (uuid.UUID, error) {
+	authorIDString := r.URL.Query().Get("author_id")
+	if authorIDString == "" {
+		return uuid.Nil, nil
+	}
+	authorID, err := uuid.Parse(authorIDString)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't retrieve chirps", err)
+		return uuid.Nil, err
+	}
+	return authorID, nil
+}
+
+func (cfg *apiConfig) handlerChirpsCounter(w http.ResponseWriter, r *http.Request) {
+	authorID, err := authorIDFromRequest(r)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid author ID", err)
+		return
+	}
+
+	var dbChirps []database.Chirp
+	var err2 error
+
+	if authorID != uuid.Nil {
+		dbChirps, err2 = cfg.db.GetChirpsByAuthor(r.Context(), authorID)
+	} else {
+		dbChirps, err2 = cfg.db.GetChirps(r.Context())
+	}
+	if err2 != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't retrieve chirps", err2)
 		return
 	}
 
